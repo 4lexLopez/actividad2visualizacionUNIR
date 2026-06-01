@@ -1,0 +1,236 @@
+
+\documentclass[12pt,a4paper]{article}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{listings}
+\usepackage{longtable}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+
+\title{Preparación y Transformación del Archivo causeofdeath.csv\\para Análisis en Google Looker Studio}
+\author{Generado automáticamente}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Objetivo}
+Este documento describe el proceso de exploración, limpieza, transformación y enriquecimiento del archivo \texttt{causeofdeath.csv} utilizando Python, con el propósito de construir posteriormente un tablero analítico en Google Looker Studio.
+
+\section{Descripción del conjunto de datos}
+El archivo contiene 338 registros y 6 columnas:
+
+\begin{itemize}
+\item Location
+\item Age
+\item Sex
+\item Cause of death or injury
+\item Measure
+\item Value
+\end{itemize}
+
+Características identificadas:
+
+\begin{itemize}
+\item Separador: punto y coma (;)
+\item Los valores numéricos utilizan coma decimal.
+\item La ubicación corresponde a datos globales.
+\item Existen dos métricas:
+    \begin{itemize}
+    \item Percent of total deaths 2017
+    \item Deaths annual \% change 2010-2017
+    \end{itemize}
+\end{itemize}
+
+\section{Carga inicial del archivo}
+
+\begin{lstlisting}[language=Python]
+import pandas as pd
+
+df = pd.read_csv(
+    "causeofdeath.csv",
+    sep=";"
+)
+\end{lstlisting}
+
+Verificación inicial:
+
+\begin{lstlisting}[language=Python]
+print(df.head())
+print(df.shape)
+print(df.columns)
+\end{lstlisting}
+
+\section{Validación de calidad de datos}
+
+\subsection{Valores nulos}
+
+\begin{lstlisting}[language=Python]
+df.isnull().sum()
+\end{lstlisting}
+
+\subsection{Tipos de datos}
+
+\begin{lstlisting}[language=Python]
+df.dtypes
+\end{lstlisting}
+
+Se identifica que la columna \texttt{Value} se encuentra almacenada como texto debido al uso de coma decimal.
+
+\section{Transformación de la variable numérica}
+
+\begin{lstlisting}[language=Python]
+df["Value"] = (
+    df["Value"]
+    .str.replace(",", ".", regex=False)
+    .astype(float)
+)
+\end{lstlisting}
+
+\section{Separación de métricas}
+
+Para facilitar el análisis se crea una tabla pivote.
+
+\begin{lstlisting}[language=Python]
+pivot_df = (
+    df.pivot_table(
+        index="Cause of death or injury",
+        columns="Measure",
+        values="Value",
+        aggfunc="first"
+    )
+    .reset_index()
+)
+\end{lstlisting}
+
+Resultado esperado:
+
+\begin{itemize}
+\item Causa de muerte
+\item Porcentaje del total de muertes en 2017
+\item Variación anual de muertes 2010-2017
+\end{itemize}
+
+\section{Análisis exploratorio}
+
+\subsection{Principales causas de muerte}
+
+\begin{lstlisting}[language=Python]
+top_causes = (
+    pivot_df
+    .sort_values(
+        "Percent of total deaths 2017",
+        ascending=False
+    )
+    .head(20)
+)
+\end{lstlisting}
+
+\subsection{Causas con mayor crecimiento}
+
+\begin{lstlisting}[language=Python]
+growing_causes = (
+    pivot_df
+    .sort_values(
+        "Deaths annual % change 2010-2017",
+        ascending=False
+    )
+    .head(20)
+)
+\end{lstlisting}
+
+\subsection{Causas con mayor reducción}
+
+\begin{lstlisting}[language=Python]
+declining_causes = (
+    pivot_df
+    .sort_values(
+        "Deaths annual % change 2010-2017"
+    )
+    .head(20)
+)
+\end{lstlisting}
+
+\section{Fuente de datos complementaria}
+
+Se recomienda integrar indicadores de salud de la población provenientes de la entidad
+\url{https://data.worldbank.org}.
+
+Variables sugeridas:
+
+\begin{itemize}
+\item Esperanza de vida al nacer.
+\item Población total mundial.
+\item Gasto en salud per cápita.
+\item Mortalidad infantil.
+\end{itemize}
+
+\subsection{Descarga mediante API}
+
+\begin{lstlisting}[language=Python]
+import requests
+import pandas as pd
+
+url = (
+"https://api.worldbank.org/v2/"
+"country/WLD/indicator/SP.DYN.LE00.IN"
+"?format=json&per_page=100"
+)
+
+data = requests.get(url).json()
+\end{lstlisting}
+
+\subsection{Preparación de la información}
+
+\begin{lstlisting}[language=Python]
+records = []
+
+for row in data[1]:
+    records.append({
+        "year": row["date"],
+        "life_expectancy": row["value"]
+    })
+
+life_df = pd.DataFrame(records)
+\end{lstlisting}
+
+\section{Modelo analítico integrado}
+
+El flujo completo sería:
+
+\begin{enumerate}
+\item Cargar causa de muerte.
+\item Limpiar valores numéricos.
+\item Pivotear métricas.
+\item Incorporar indicadores globales del Banco Mundial.
+\item Generar dataset consolidado.
+\item Exportar a CSV.
+\item Conectar el archivo a Google Looker Studio.
+\end{enumerate}
+
+\section{Exportación para Looker Studio}
+
+\begin{lstlisting}[language=Python]
+pivot_df.to_csv(
+    "cause_of_death_prepared.csv",
+    index=False
+)
+\end{lstlisting}
+
+\section{Visualizaciones recomendadas}
+
+\begin{enumerate}
+\item Ranking de principales causas de muerte.
+\item Gráfico de barras de participación porcentual.
+\item Heatmap de crecimiento o reducción.
+\item Tabla dinámica con filtros.
+\item Indicadores KPI.
+\item Serie temporal enriquecida con esperanza de vida.
+\item Dispersión entre porcentaje de muertes y crecimiento.
+\end{enumerate}
+
+\section{Conclusiones}
+
+La transformación propuesta convierte un conjunto de datos descriptivo en una estructura analítica apta para Google Looker Studio. La incorporación de indicadores del Banco Mundial permite contextualizar las causas de muerte frente a tendencias demográficas y de salud pública, enriqueciendo significativamente el análisis.
+\end{document}
