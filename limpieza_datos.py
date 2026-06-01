@@ -60,4 +60,4 @@ print(df_filtrado)
 # -------------------------------------------------------------
 # Guardamos los datos limpios en un nuevo archivo CSV sin el índice numérico
 df_filtrado.to_csv('datos_limpios.csv', index=False)
-print("\n--- ¡Proceso completado! Archivo 'datos_limpios.csv' guardado ---")
+print("\n--- ¡Proceso completado! Archivo 'datos_limpios.csv' guardado ---")|q
